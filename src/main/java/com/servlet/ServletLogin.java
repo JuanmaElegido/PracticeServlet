@@ -9,6 +9,10 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import com.modelo.IUsuariosFachada;
+import com.modelo.UsuariosDTO;
+import com.modelo.UsuariosFachada;
+
 /**
  * Servlet implementation class ServletLogin
  */
@@ -16,67 +20,72 @@ import javax.servlet.http.HttpServletResponse;
 public class ServletLogin extends HttpServlet {
 	private static final long serialVersionUID = 1L;
        
-	/**
-	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
-	 */
-	protected void doGet(HttpServletRequest peticion, HttpServletResponse respuesta) 
-			throws ServletException, IOException {
-
-	}
-
 	@Override
 	protected void doPost(HttpServletRequest peticion, HttpServletResponse respuesta) throws ServletException, IOException {
 		// *** 1º CAPTURA DE INFORMACION DE LA PETICION ENVIADA ***
-		String valorAplicacion = peticion.getParameter("nombre-aplicacion");
 		String valorNombre = peticion.getParameter("nombre-usuario");
 		String valorClave = peticion.getParameter("clave-usuario");
-		String valorObservacion = peticion.getParameter("observaciones");
-		String primerAviso = peticion.getParameter("primerAviso");
-		boolean formularioValido = false;
+		String stringIntento = peticion.getParameter("intento2");
+		boolean formularioValido = true;
+		boolean usuarioValido = false;
 		
 		// *** 2º CONVERSION ***
+		String valorAplicacion = "APP-"+valorNombre.toUpperCase();
+		Long numeroIntento;
 		
-		// *** 3º VALIDACION *** 
-		if (null == valorAplicacion || null == valorNombre || null == valorClave || 
-					valorAplicacion.isEmpty() || valorNombre.isEmpty() || valorClave.isEmpty()) {
-			// Cuando faltan datos obligatorios por completar
-			formularioValido = false;	
-			
-		} else if (valorObservacion.isEmpty() && primerAviso == ""){
-			// Cuando se han completado los campos obligatorios y
-			// es la primera vez que recordamos completar observaciones.
-			peticion.setAttribute("primerAviso", "avisado");
-			formularioValido = false;	
-			
+		if (stringIntento == null || stringIntento == "") {
+			numeroIntento = 1L;
 		} else {
-			// Cuando hemos preguntado una vez para recordar completar observaciones
-			// y ademas el resto de datos obligatorios estan ya cumplimentados
-			// se da por completado el formulario.
-			formularioValido = true;
+			numeroIntento = Long.parseLong(stringIntento);
 		}
-		
-		// *** 4º LOGICA DE NEGOCIO *** 
-		
-		peticion.getServletContext().setAttribute("aplicacion", valorAplicacion);
-		peticion.getSession().setAttribute("nombre", valorNombre);
-		peticion.getSession().setAttribute("clave", valorClave);
+				
+		// *** 3º VALIDACION *** 
+		if (null == valorNombre || null == valorClave ||
+					valorNombre.isEmpty() || valorClave.isEmpty() ||
+					valorClave.equals("") || valorClave.length() < 5) {
+			// Formulario no valido (Cuando faltan datos obligatorios por completar)
+			formularioValido = false;	
+//			peticion.setAttribute("primerAviso", "avisado");
+		} 
 
+		
+		// *** 4º LOGICA DE NEGOCIO ***
+		if (formularioValido){
+			IUsuariosFachada usuarioFachada = new UsuariosFachada();
+			UsuariosDTO usuarioConsultado = usuarioFachada.consultarCredenciales(valorNombre);
+			if(usuarioConsultado != null ) {
+				if(usuarioConsultado.getClaveUsuario().equals(valorClave)){
+					// CREDENCIALES CORRECTAS
+					usuarioValido = true;
+				}else {
+					// ERROR CLAVE INCORRECTA 
+					numeroIntento = numeroIntento++;
+					stringIntento = numeroIntento.toString();
+					usuarioValido = false;
+				}
+			}else {
+				numeroIntento = numeroIntento+1;
+				stringIntento = numeroIntento.toString();
+				peticion.getSession().setAttribute("intento2", stringIntento);
+				// ERROR DE NOMBRE DE USUARIO
+				usuarioValido = false;
+			}
+		} 
+		
 		// *** 5º NAVEGACION *** 
-		if (formularioValido) {
-			// Mandamos a enviado y presentamos los datos
-			peticion.setAttribute("observacion", valorObservacion);
-			RequestDispatcher rqd = peticion.getRequestDispatcher("/jsp/enviado.jsp");
+		if (usuarioValido){
+			peticion.getServletContext().setAttribute("aplicacion", valorAplicacion);
+			peticion.getSession().setAttribute("nombre", valorNombre);
+			peticion.setAttribute("clave", valorClave);
+			RequestDispatcher rqd = peticion.getRequestDispatcher("/jsp/sesionUsuario.jsp");
 			rqd.include(peticion, respuesta);
 //			rqd.forward(peticion, respuesta);
-			
 		} else {
-			// Mantenemos en el formulario: faltan datos por rellenar
-			// 								observaciones vacias (solo se pasa una vez)
-			peticion.setAttribute("clave", valorClave);
+			peticion.removeAttribute("nombre-usuario");
+			peticion.removeAttribute("clave-usuario");
 			RequestDispatcher rqd = peticion.getRequestDispatcher("/jsp/login.jsp");
 			rqd.include(peticion, respuesta);
 //			rqd.forward(peticion, respuesta);
-			
 		}
 	}
 }
