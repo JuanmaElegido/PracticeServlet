@@ -23,28 +23,48 @@ public class ServletLogin extends HttpServlet {
 	@Override
 	protected void doPost(HttpServletRequest peticion, HttpServletResponse respuesta) throws ServletException, IOException {
 		// *** 1º CAPTURA DE INFORMACION DE LA PETICION ENVIADA ***
+		String stringIntento = peticion.getParameter("intento2");
 		String valorNombre = peticion.getParameter("nombre-usuario");
 		String valorClave = peticion.getParameter("clave-usuario");
-		String stringIntento = peticion.getParameter("intento2");
+		String errorUsuario = "";
+		String errorClave = "";
+		Long numeroIntento;
 		boolean formularioValido = true;
 		boolean usuarioValido = false;
 		
 		// *** 2º CONVERSION ***
 		String valorAplicacion = "APP-"+valorNombre.toUpperCase();
-		Long numeroIntento;
+
+		// *** 3º VALIDACION ***
 		
+		// CONTADOR DE INTENTOS
+
 		if (stringIntento == null || stringIntento == "") {
+			// Primer intento
 			numeroIntento = 1L;
-		} else {
+			stringIntento = numeroIntento.toString();
+			
+		} else if (Long.parseLong(stringIntento)<9) {
+			// Dentro de los intentos permitidos
 			numeroIntento = Long.parseLong(stringIntento);
+			numeroIntento = numeroIntento+1;
+			stringIntento = numeroIntento.toString();
+			peticion.getSession().setAttribute("intento2", stringIntento);
+			
+		} else {
+			// Superados los intentos y se manda a exit.jsp
+			RequestDispatcher rqd = peticion.getRequestDispatcher("/jsp/exit.jsp");
+			rqd.forward(peticion, respuesta);
+			return;
 		}
-				
-		// *** 3º VALIDACION *** 
+
+		// Verificación de campos obligatorios completos
 		if (null == valorNombre || null == valorClave ||
 					valorNombre.isEmpty() || valorClave.isEmpty() ||
 					valorClave.equals("") || valorClave.length() < 5) {
 			// Formulario no valido (Cuando faltan datos obligatorios por completar)
 			formularioValido = false;	
+			errorClave = "Clave incorrecta.";
 //			peticion.setAttribute("primerAviso", "avisado");
 		} 
 
@@ -53,39 +73,44 @@ public class ServletLogin extends HttpServlet {
 		if (formularioValido){
 			IUsuariosFachada usuarioFachada = new UsuariosFachada();
 			UsuariosDTO usuarioConsultado = usuarioFachada.consultarCredenciales(valorNombre);
+			
 			if(usuarioConsultado != null ) {
 				if(usuarioConsultado.getClaveUsuario().equals(valorClave)){
-					// CREDENCIALES CORRECTAS
+					// Credenciales correctas
 					usuarioValido = true;
+					
 				}else {
-					// ERROR CLAVE INCORRECTA 
+					// Error clave incorrecta 
 					numeroIntento = numeroIntento++;
 					stringIntento = numeroIntento.toString();
 					usuarioValido = false;
+					errorClave = "Clave incorrecta.";
 				}
+				
 			}else {
-				numeroIntento = numeroIntento+1;
-				stringIntento = numeroIntento.toString();
-				peticion.getSession().setAttribute("intento2", stringIntento);
-				// ERROR DE NOMBRE DE USUARIO
+				// Error nombre de usuario incorrecto
 				usuarioValido = false;
+				errorUsuario = "Nombre de usuario incorrecto.";
 			}
 		} 
 		
 		// *** 5º NAVEGACION *** 
 		if (usuarioValido){
+			// Usuario identificado pasa a sesionUsuario.jsp
 			peticion.getServletContext().setAttribute("aplicacion", valorAplicacion);
 			peticion.getSession().setAttribute("nombre", valorNombre);
+			peticion.getSession().setAttribute("UsuarioValido", "true");
+			peticion.getSession().removeAttribute("intento2");
 			peticion.setAttribute("clave", valorClave);
 			RequestDispatcher rqd = peticion.getRequestDispatcher("/jsp/sesionUsuario.jsp");
-			rqd.include(peticion, respuesta);
-//			rqd.forward(peticion, respuesta);
+			rqd.forward(peticion, respuesta);
+			
 		} else {
-			peticion.removeAttribute("nombre-usuario");
-			peticion.removeAttribute("clave-usuario");
+			// Usuario no identificado se queda en la pagina de login.jsp
+			peticion.getSession().setAttribute("intento2", stringIntento);
+			peticion.getSession().setAttribute("UsuarioValido", "false");
 			RequestDispatcher rqd = peticion.getRequestDispatcher("/jsp/login.jsp");
-			rqd.include(peticion, respuesta);
-//			rqd.forward(peticion, respuesta);
+			rqd.forward(peticion, respuesta);
 		}
 	}
 }
