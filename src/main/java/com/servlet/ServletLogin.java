@@ -1,6 +1,7 @@
 package com.servlet;
 
 import java.io.IOException;
+import java.util.ResourceBundle;
 
 import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
@@ -24,13 +25,19 @@ public class ServletLogin extends HttpServlet {
 	protected void doPost(HttpServletRequest peticion, HttpServletResponse respuesta) throws ServletException, IOException {
 		// *** 1º CAPTURA DE INFORMACION DE LA PETICION ENVIADA ***
 		String stringIntento = peticion.getParameter("intento2");
-		String valorNombre = peticion.getParameter("nombre-usuario");
-		String valorClave = peticion.getParameter("clave-usuario");
+		String valorNombre = peticion.getParameter("nombreUsuario");
+		String valorClave = peticion.getParameter("claveUsuario");
 		String errorUsuario = "";
 		String errorClave = "";
 		Long numeroIntento;
 		boolean formularioValido = true;
 		boolean usuarioValido = false;
+		
+		// Lectura del properties
+		ResourceBundle rb;
+		rb = ResourceBundle.getBundle("com.properties.configuracion");
+		String maxNumeroIntentos = rb.getString("loging.maxNumeroIntentos");
+		peticion.getSession().setAttribute("maxNumeroIntentos", maxNumeroIntentos);
 		
 		// *** 2º CONVERSION ***
 		String valorAplicacion = "APP-"+valorNombre.toUpperCase();
@@ -44,7 +51,7 @@ public class ServletLogin extends HttpServlet {
 			numeroIntento = 1L;
 			stringIntento = numeroIntento.toString();
 			
-		} else if (Long.parseLong(stringIntento)<9) {
+		} else if (Long.parseLong(stringIntento)<Long.parseLong(maxNumeroIntentos)) {
 			// Dentro de los intentos permitidos
 			numeroIntento = Long.parseLong(stringIntento);
 			numeroIntento = numeroIntento+1;
@@ -85,6 +92,8 @@ public class ServletLogin extends HttpServlet {
 					stringIntento = numeroIntento.toString();
 					usuarioValido = false;
 					errorClave = "Clave incorrecta.";
+					System.out.println("inicio");
+					System.out.println("fin");
 				}
 				
 			}else {
@@ -107,6 +116,8 @@ public class ServletLogin extends HttpServlet {
 			
 		} else {
 			// Usuario no identificado se queda en la pagina de login.jsp
+			peticion.getSession().setAttribute("nombre", valorNombre);
+			peticion.setAttribute("clave", valorClave);
 			peticion.getSession().setAttribute("intento2", stringIntento);
 			peticion.getSession().setAttribute("UsuarioValido", "false");
 			RequestDispatcher rqd = peticion.getRequestDispatcher("/jsp/login.jsp");
